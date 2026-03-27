@@ -1,0 +1,35 @@
+/* Bổ sung layout (file được index.html tham chiếu; giao diện chính nằm trong main.css / admin.css) */
+
+.menu-list-item.active .menu-link::after {
+    visibility: visible;
+    transform: scale(1);
+    opacity: 1;
+}
+
+.change-login button.login-link,
+.change-login button.signup-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: var(--red);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+button.sidebar-link {
+    background: none;
+    border: none;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+/* SPA React: luôn hiển thị trang tài khoản / lịch sử (CSS gốc dùng .open cho HTML tĩnh) */
+#account-user,
+#order-history {
+    display: flex !important;
+    justify-content: center;
+    background-color: #fff;
+    padding-bottom: 40px;
+}
