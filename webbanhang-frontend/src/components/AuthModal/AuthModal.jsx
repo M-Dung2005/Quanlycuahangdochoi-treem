@@ -6,8 +6,10 @@ function AuthModal({ isOpen, onClose }) {
     const { login, showToast } = useApp();
     const [isLoginTab, setIsLoginTab] = useState(true);
 
-    const [loginForm, setLoginForm] = useState({ phone: '', password: '' });
-    const [regForm, setRegForm] = useState({ fullname: '', phone: '', password: '' });
+    // Form đăng nhập: dùng field mới của backend
+    const [loginForm, setLoginForm] = useState({ soDienThoai: '', matKhau: '' });
+    // Form đăng ký: dùng field mới của backend  
+    const [regForm, setRegForm] = useState({ hoVaTen: '', soDienThoai: '', matKhau: '' });
 
     const [errors, setErrors] = useState({});
 
@@ -20,6 +22,7 @@ function AuthModal({ isOpen, onClose }) {
         e.preventDefault();
         try {
             const res = await axiosClient.post('/auth/login', loginForm);
+            // res.user đã được normalize bởi AppContext.login()
             login(res.user, res.token);
             onClose();
         } catch (error) {
@@ -32,7 +35,7 @@ function AuthModal({ isOpen, onClose }) {
         try {
             await axiosClient.post('/auth/register', regForm);
             showToast('Đăng ký thành công! Vui lòng đăng nhập', 'success');
-            setLoginForm({ phone: regForm.phone, password: '' });
+            setLoginForm({ soDienThoai: regForm.soDienThoai, matKhau: '' });
             setIsLoginTab(true);
         } catch (error) {
             setErrors({ register: error.message || 'Lỗi đăng ký' });
@@ -49,6 +52,7 @@ function AuthModal({ isOpen, onClose }) {
                     <i className="fa-regular fa-xmark"></i>
                 </button>
                 <div className="forms mdl-cnt">
+                    {/* Form Đăng ký */}
                     <div className="form-content sign-up">
                         <h3 className="form-title">Đăng ký tài khoản</h3>
                         <p className="form-description">
@@ -56,56 +60,46 @@ function AuthModal({ isOpen, onClose }) {
                         </p>
                         <form className="signup-form" onSubmit={submitRegister}>
                             <div className="form-group">
-                                <label htmlFor="fullname" className="form-label">
-                                    Tên đầy đủ
-                                </label>
+                                <label htmlFor="hoVaTen" className="form-label">Tên đầy đủ</label>
                                 <input
-                                    id="fullname"
-                                    name="fullname"
+                                    id="hoVaTen"
+                                    name="hoVaTen"
                                     type="text"
                                     placeholder="VD: Nguyễn Văn A"
                                     className="form-control"
-                                    value={regForm.fullname}
+                                    value={regForm.hoVaTen}
                                     onChange={handleRegChange}
                                     required
                                 />
                             </div>
                             <div className="form-group">
-                                <label htmlFor="phone-reg" className="form-label">
-                                    Số điện thoại
-                                </label>
+                                <label htmlFor="phone-reg" className="form-label">Số điện thoại</label>
                                 <input
                                     id="phone-reg"
-                                    name="phone"
+                                    name="soDienThoai"
                                     type="text"
                                     placeholder="Nhập số điện thoại"
                                     className="form-control"
-                                    value={regForm.phone}
+                                    value={regForm.soDienThoai}
                                     onChange={handleRegChange}
                                     required
                                 />
                             </div>
                             <div className="form-group">
-                                <label htmlFor="password-reg" className="form-label">
-                                    Mật khẩu
-                                </label>
+                                <label htmlFor="password-reg" className="form-label">Mật khẩu</label>
                                 <input
                                     id="password-reg"
-                                    name="password"
+                                    name="matKhau"
                                     type="password"
                                     placeholder="Nhập mật khẩu"
                                     className="form-control"
-                                    value={regForm.password}
+                                    value={regForm.matKhau}
                                     onChange={handleRegChange}
                                     required
                                 />
                             </div>
-                            {errors.register && (
-                                <p className="form-message">{errors.register}</p>
-                            )}
-                            <button className="form-submit" type="submit" id="signup-button">
-                                Đăng ký
-                            </button>
+                            {errors.register && <p className="form-message">{errors.register}</p>}
+                            <button className="form-submit" type="submit" id="signup-button">Đăng ký</button>
                         </form>
                         <p className="change-login">
                             Bạn đã có tài khoản?{' '}
@@ -114,6 +108,8 @@ function AuthModal({ isOpen, onClose }) {
                             </button>
                         </p>
                     </div>
+
+                    {/* Form Đăng nhập */}
                     <div className="form-content login">
                         <h3 className="form-title">Đăng nhập tài khoản</h3>
                         <p className="form-description">
@@ -121,39 +117,33 @@ function AuthModal({ isOpen, onClose }) {
                         </p>
                         <form className="login-form" onSubmit={submitLogin}>
                             <div className="form-group">
-                                <label htmlFor="phone-login" className="form-label">
-                                    Số điện thoại
-                                </label>
+                                <label htmlFor="phone-login" className="form-label">Số điện thoại</label>
                                 <input
                                     id="phone-login"
-                                    name="phone"
+                                    name="soDienThoai"
                                     type="text"
                                     placeholder="Nhập số điện thoại"
                                     className="form-control"
-                                    value={loginForm.phone}
+                                    value={loginForm.soDienThoai}
                                     onChange={handleLoginChange}
                                     required
                                 />
                             </div>
                             <div className="form-group">
-                                <label htmlFor="password-login" className="form-label">
-                                    Mật khẩu
-                                </label>
+                                <label htmlFor="password-login" className="form-label">Mật khẩu</label>
                                 <input
                                     id="password-login"
-                                    name="password"
+                                    name="matKhau"
                                     type="password"
                                     placeholder="Nhập mật khẩu"
                                     className="form-control"
-                                    value={loginForm.password}
+                                    value={loginForm.matKhau}
                                     onChange={handleLoginChange}
                                     required
                                 />
                             </div>
                             {errors.login && <p className="form-message phonelog">{errors.login}</p>}
-                            <button className="form-submit" type="submit" id="login-button">
-                                Đăng nhập
-                            </button>
+                            <button className="form-submit" type="submit" id="login-button">Đăng nhập</button>
                         </form>
                         <p className="change-login">
                             Bạn chưa có tài khoản?{' '}

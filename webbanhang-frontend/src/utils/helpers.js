@@ -41,3 +41,73 @@ export const removeVietnameseTones = (str) => {
     str = str.replace(/Đ/g, "D");
     return str.toLowerCase();
 };
+
+// ─── ADAPTER FUNCTIONS ─────────────────────────────────────────
+// Map schema mới (tiếng Việt) → shape cũ mà toàn bộ components đang dùng
+
+/**
+ * SanPham → product shape { id, title, img, price, category, status, soLuongTon }
+ */
+export const normalizeProduct = (p) => {
+    if (!p) return null;
+    if (p.title !== undefined) return p; // đã normalize
+    return {
+        ...p,
+        title:      p.tieuDe    ?? '',
+        img:        p.hinhAnh   ?? '',
+        price:      Number(p.gia ?? 0),
+        category:   p.danhMuc?.tenDanhMuc ?? '',
+        status:     p.trangThai ?? 1,
+        soLuongTon: p.khoHang?.soLuongTon ?? 0,
+    };
+};
+
+/**
+ * NguoiDung → user shape { id, fullname, phone, email, address, userType, status }
+ */
+export const normalizeUser = (u) => {
+    if (!u) return null;
+    if (u.fullname !== undefined) return u; // đã normalize
+    return {
+        ...u,
+        fullname: u.hoVaTen       ?? '',
+        phone:    u.soDienThoai   ?? '',
+        email:    u.email         ?? '',
+        address:  u.diaChi        ?? '',
+        userType: u.loaiNguoiDung ?? 0,
+        status:   u.trangThai     ?? 1,
+    };
+};
+
+/**
+ * DonHang → order shape { id, receiverName, receiverPhone, address,
+ *   deliveryType, deliveryTime, totalPrice, status, createdAt, items[] }
+ */
+export const normalizeOrder = (o) => {
+    if (!o) return null;
+    if (o.receiverName !== undefined) return o; // đã normalize
+    const items = (o.chiTiets ?? o.items ?? []).map((ct) => ({
+        ...ct,
+        qty:   ct.soLuong ?? ct.qty ?? 1,
+        price: Number(ct.donGia ?? ct.price ?? 0),
+        product: ct.sanPham
+            ? {
+                ...ct.sanPham,
+                title: ct.sanPham.tieuDe  ?? ct.sanPham.title ?? '',
+                img:   ct.sanPham.hinhAnh ?? ct.sanPham.img   ?? '',
+              }
+            : ct.product ?? null,
+    }));
+    return {
+        ...o,
+        receiverName:  o.tenNguoiNhan           ?? '',
+        receiverPhone: o.soDienThoaiNguoiNhan    ?? '',
+        address:       o.diaChi                 ?? '',
+        deliveryType:  o.loaiGiaoHang           ?? '',
+        deliveryTime:  o.thoiGianGiaoHang        ?? '',
+        totalPrice:    Number(o.tongGia          ?? 0),
+        status:        o.trangThai              ?? 0,
+        createdAt:     o.ngayTao                ?? o.createdAt ?? null,
+        items,
+    };
+};

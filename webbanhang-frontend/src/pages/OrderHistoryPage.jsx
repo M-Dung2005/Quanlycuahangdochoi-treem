@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axios';
-import { vnd, formatDate } from '../utils/helpers';
+import { vnd, formatDate, normalizeOrder } from '../utils/helpers';
 
 function OrderHistoryPage() {
     const { user } = useApp();
@@ -18,7 +18,8 @@ function OrderHistoryPage() {
         const fetchOrders = async () => {
             try {
                 const data = await axiosClient.get('/orders/me');
-                setOrders(data);
+                const list = Array.isArray(data) ? data : [];
+                setOrders(list.map(normalizeOrder));
             } catch (error) {
                 console.error('Lỗi lấy đơn hàng:', error);
             }
@@ -28,6 +29,17 @@ function OrderHistoryPage() {
     }, [user, navigate]);
 
     if (!user) return null;
+
+    const statusLabel = (s) => {
+        const map = {
+            0: { text: 'Đang chờ xử lý', color: '#e67e22' },
+            1: { text: 'Đã xác nhận',    color: '#2980b9' },
+            2: { text: 'Đang giao hàng', color: '#8e44ad' },
+            3: { text: 'Hoàn thành',     color: 'green'   },
+            4: { text: 'Đã hủy',         color: '#c0392b' },
+        };
+        return map[s] ?? { text: 'Không rõ', color: '#888' };
+    };
 
     return (
         <main className="main-wrapper">
@@ -44,83 +56,73 @@ function OrderHistoryPage() {
                                     Bạn chưa có đơn hàng nào.
                                 </p>
                             ) : (
-                                orders.map((order) => (
-                                    <div
-                                        key={order.id}
-                                        className="list"
-                                        style={{ marginBottom: '16px', flexDirection: 'column', alignItems: 'stretch' }}
-                                    >
+                                orders.map((order) => {
+                                    const st = statusLabel(order.status);
+                                    return (
                                         <div
-                                            style={{
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                flexWrap: 'wrap',
-                                                gap: '12px',
-                                                borderBottom: '1px solid #eee',
-                                                paddingBottom: '12px',
-                                                marginBottom: '12px',
-                                            }}
+                                            key={order.id}
+                                            className="list"
+                                            style={{ marginBottom: '16px', flexDirection: 'column', alignItems: 'stretch' }}
                                         >
-                                            <div>
-                                                <strong>Mã đơn #{order.id}</strong>
-                                                <p style={{ margin: '8px 0 0', fontSize: '14px', color: '#666' }}>
-                                                    Ngày đặt: {formatDate(order.createdAt)}
-                                                </p>
+                                            <div style={{
+                                                display: 'flex', justifyContent: 'space-between',
+                                                flexWrap: 'wrap', gap: '12px',
+                                                borderBottom: '1px solid #eee', paddingBottom: '12px', marginBottom: '12px'
+                                            }}>
+                                                <div>
+                                                    <strong>Mã đơn #{order.id}</strong>
+                                                    <p style={{ margin: '8px 0 0', fontSize: '14px', color: '#666' }}>
+                                                        Ngày đặt: {formatDate(order.createdAt)}
+                                                    </p>
+                                                </div>
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <p style={{ margin: 0 }}>
+                                                        <strong>Trạng thái:</strong>{' '}
+                                                        <span style={{ color: st.color }}>{st.text}</span>
+                                                    </p>
+                                                    <p style={{ margin: '8px 0 0', color: '#b5292f', fontWeight: 600 }}>
+                                                        {vnd(order.totalPrice)}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <p style={{ margin: 0 }}>
-                                                    <strong>Trạng thái:</strong>{' '}
-                                                    {order.status === 1 ? (
-                                                        <span style={{ color: 'green' }}>Đã xử lý</span>
-                                                    ) : (
-                                                        <span style={{ color: '#e67e22' }}>Đang chờ xử lý</span>
-                                                    )}
-                                                </p>
-                                                <p style={{ margin: '8px 0 0', color: '#b5292f', fontWeight: 600 }}>
-                                                    {vnd(order.totalPrice)}
-                                                </p>
-                                            </div>
+                                            <p style={{ margin: '0 0 8px' }}>
+                                                <strong>Người nhận:</strong> {order.receiverName} — {order.receiverPhone}
+                                            </p>
+                                            <p style={{ margin: '0 0 8px' }}>
+                                                <strong>Địa chỉ:</strong> {order.address}
+                                            </p>
+                                            <p style={{ margin: '0 0 12px' }}>
+                                                <strong>Giao hàng:</strong> {order.deliveryType} ({order.deliveryTime})
+                                            </p>
+                                            <h4 style={{ fontSize: '15px', marginBottom: '8px' }}>Sản phẩm</h4>
+                                            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                                                {order.items?.map((item) => (
+                                                    <li
+                                                        key={item.id}
+                                                        style={{
+                                                            display: 'flex', alignItems: 'center', gap: '12px',
+                                                            padding: '8px 0', borderTop: '1px solid #f0f0f0'
+                                                        }}
+                                                    >
+                                                        <img
+                                                            src={item.product?.img || '/assets/img/blank-image.png'}
+                                                            alt=""
+                                                            style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6 }}
+                                                        />
+                                                        <div style={{ flex: 1 }}>
+                                                            <p style={{ margin: 0, fontWeight: 500 }}>
+                                                                {item.product?.title || 'Sản phẩm'}
+                                                            </p>
+                                                            <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#666' }}>
+                                                                {vnd(item.price)} × {item.qty}
+                                                            </p>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                            </ul>
                                         </div>
-                                        <p style={{ margin: '0 0 8px' }}>
-                                            <strong>Người nhận:</strong> {order.receiverName} — {order.receiverPhone}
-                                        </p>
-                                        <p style={{ margin: '0 0 8px' }}>
-                                            <strong>Địa chỉ:</strong> {order.address}
-                                        </p>
-                                        <p style={{ margin: '0 0 12px' }}>
-                                            <strong>Giao hàng:</strong> {order.deliveryType} ({order.deliveryTime})
-                                        </p>
-                                        <h4 style={{ fontSize: '15px', marginBottom: '8px' }}>Sản phẩm</h4>
-                                        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                                            {order.items?.map((item) => (
-                                                <li
-                                                    key={item.id}
-                                                    style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '12px',
-                                                        padding: '8px 0',
-                                                        borderTop: '1px solid #f0f0f0',
-                                                    }}
-                                                >
-                                                    <img
-                                                        src={item.product?.img || '/assets/img/blank-image.png'}
-                                                        alt=""
-                                                        style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6 }}
-                                                    />
-                                                    <div style={{ flex: 1 }}>
-                                                        <p style={{ margin: 0, fontWeight: 500 }}>
-                                                            {item.product?.title || 'Sản phẩm'}
-                                                        </p>
-                                                        <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#666' }}>
-                                                            {vnd(item.price)} × {item.qty}
-                                                        </p>
-                                                    </div>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
                     </div>

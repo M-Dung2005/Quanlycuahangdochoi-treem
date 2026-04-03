@@ -1,17 +1,16 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import axiosClient from '../api/axios';
+import { normalizeUser, normalizeProduct } from '../utils/helpers';
 
 const AppContext = createContext();
 
-// Khởi tạo State ban đầu
 const initialState = {
-    user: null,         // Object thông tin user sau khi login (hoặc kiểm tra token)
-    cart: [],           // Mảng sản phẩm giỏ hàng: [{ id, title, img, price, soluong }]
-    isCartOpen: false,  // Quản lý đóng/mở sidebar giỏ hàng
-    toast: null         // Thông báo: { type, message }
+    user: null,
+    cart: [],
+    isCartOpen: false,
+    toast: null
 };
 
-// Khôi phục giỏ hàng từ localStorage
 const initCart = () => {
     const localCart = localStorage.getItem('cart');
     return localCart ? JSON.parse(localCart) : [];
@@ -23,23 +22,17 @@ const appReducer = (state, action) => {
     switch (action.type) {
         case 'LOGIN':
             return { ...state, user: action.payload };
-            
         case 'LOGOUT':
             localStorage.removeItem('token');
             return { ...state, user: null };
-
         case 'SET_CART':
             return { ...state, cart: action.payload };
-            
         case 'TOGGLE_CART':
             return { ...state, isCartOpen: !state.isCartOpen };
-            
         case 'SHOW_TOAST':
             return { ...state, toast: action.payload };
-            
         case 'HIDE_TOAST':
             return { ...state, toast: null };
-            
         default:
             return state;
     }
@@ -48,7 +41,6 @@ const appReducer = (state, action) => {
 export const AppProvider = ({ children }) => {
     const [state, dispatch] = useReducer(appReducer, initialState);
 
-    // Lưu cart vào localStorage mỗi khi State cart thay đổi
     useEffect(() => {
         localStorage.setItem('cart', JSON.stringify(state.cart));
     }, [state.cart]);
@@ -59,9 +51,8 @@ export const AppProvider = ({ children }) => {
             if (localStorage.getItem('token')) {
                 try {
                     const userData = await axiosClient.get('/auth/me');
-                    dispatch({ type: 'LOGIN', payload: userData });
-                } catch (error) {
-                    console.log('Token hết hạn hoặc lỗi:', error);
+                    dispatch({ type: 'LOGIN', payload: normalizeUser(userData) });
+                } catch {
                     dispatch({ type: 'LOGOUT' });
                 }
             }
@@ -69,11 +60,16 @@ export const AppProvider = ({ children }) => {
         fetchUser();
     }, []);
 
-    // Các hàm Actions dễ dùng
     const login = (userData, token) => {
         localStorage.setItem('token', token);
-        dispatch({ type: 'LOGIN', payload: userData });
+        dispatch({ type: 'LOGIN', payload: normalizeUser(userData) });
         showToast('Đăng nhập thành công!', 'success');
+    };
+
+    // Cập nhật user trong context mà không show toast (dùng khi refresh sau update profile)
+    const silentLogin = (userData, token) => {
+        if (token) localStorage.setItem('token', token);
+        dispatch({ type: 'LOGIN', payload: normalizeUser(userData) });
     };
 
     const logout = () => {
@@ -81,18 +77,20 @@ export const AppProvider = ({ children }) => {
         showToast('Đã đăng xuất', 'info');
     };
 
+    // addToCart nhận cả product từ API mới (có tieuDe/hinhAnh/gia) hoặc đã normalize
     const addToCart = (product) => {
-        const existIdx = state.cart.findIndex(item => item.id === product.id);
+        const p = normalizeProduct(product);
+        const existIdx = state.cart.findIndex(item => item.id === p.id);
         const newCart = [...state.cart];
 
         if (existIdx >= 0) {
             newCart[existIdx].soluong += 1;
         } else {
             newCart.push({
-                id: product.id,
-                title: product.title,
-                img: product.img,
-                price: product.price,
+                id:     p.id,
+                title:  p.title,
+                img:    p.img,
+                price:  p.price,
                 soluong: 1
             });
         }
@@ -116,24 +114,20 @@ export const AppProvider = ({ children }) => {
         dispatch({ type: 'SET_CART', payload: newCart });
     };
 
-    const clearCart = () => {
-        dispatch({ type: 'SET_CART', payload: [] });
-    };
-
+    const clearCart = () => dispatch({ type: 'SET_CART', payload: [] });
     const toggleCart = () => dispatch({ type: 'TOGGLE_CART' });
 
-    const showToast = (message, type = 'success') => { // success, error, warning, info
+    const showToast = (message, type = 'success') => {
         dispatch({ type: 'SHOW_TOAST', payload: { message, type } });
-        // Tự động tắt sau 3 giây
         setTimeout(() => dispatch({ type: 'HIDE_TOAST' }), 3000);
     };
 
     return (
-        <AppContext.Provider value={{ 
-            ...state, 
-            login, logout, 
-            addToCart, removeFromCart, updateCartQty, clearCart, toggleCart, 
-            showToast 
+        <AppContext.Provider value={{
+            ...state,
+            login, silentLogin, logout,
+            addToCart, removeFromCart, updateCartQty, clearCart, toggleCart,
+            showToast
         }}>
             {children}
         </AppContext.Provider>

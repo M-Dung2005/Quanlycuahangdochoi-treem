@@ -4,18 +4,19 @@ import { useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axios';
 
 function AccountPage() {
-    const { user, showToast } = useApp();
+    const { user, silentLogin, showToast } = useApp();
     const navigate = useNavigate();
 
+    // user đã được normalize trong AppContext (có fullname/phone/address)
     const [profileForm, setProfileForm] = useState({
-        fullname: '',
+        hoVaTen: '',
         email: '',
-        address: '',
+        diaChi: '',
     });
 
     const [passwordForm, setPasswordForm] = useState({
-        currentPassword: '',
-        newPassword: '',
+        matKhauCu: '',
+        matKhauMoi: '',
         confirmPassword: '',
     });
 
@@ -24,9 +25,9 @@ function AccountPage() {
             navigate('/');
         } else {
             setProfileForm({
-                fullname: user.fullname || '',
-                email: user.email || '',
-                address: user.address || '',
+                hoVaTen: user.fullname || user.hoVaTen || '',
+                email:   user.email   || '',
+                diaChi:  user.address || user.diaChi || '',
             });
         }
     }, [user, navigate]);
@@ -39,7 +40,12 @@ function AccountPage() {
     const updateProfile = async (e) => {
         e.preventDefault();
         try {
-            await axiosClient.put('/users/profile', profileForm);
+            const res = await axiosClient.put('/users/profile', profileForm);
+            // Cập nhật lại user trong context
+            if (res.user) {
+                const token = localStorage.getItem('token');
+                silentLogin(res.user, token);
+            }
             showToast('Cập nhật thông tin thành công!', 'success');
         } catch (error) {
             showToast(error.message || 'Lỗi cập nhật', 'error');
@@ -48,15 +54,17 @@ function AccountPage() {
 
     const updatePassword = async (e) => {
         e.preventDefault();
-        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+        if (passwordForm.matKhauMoi !== passwordForm.confirmPassword) {
             showToast('Mật khẩu nhập lại không khớp!', 'warning');
             return;
         }
-
         try {
-            await axiosClient.put('/users/password', passwordForm);
+            await axiosClient.put('/users/password', {
+                matKhauCu:  passwordForm.matKhauCu,
+                matKhauMoi: passwordForm.matKhauMoi,
+            });
             showToast('Đổi mật khẩu thành công!', 'success');
-            setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+            setPasswordForm({ matKhauCu: '', matKhauMoi: '', confirmPassword: '' });
         } catch (error) {
             showToast(error.message || 'Lỗi đổi mật khẩu', 'error');
         }
@@ -74,36 +82,29 @@ function AccountPage() {
                         <div className="main-account-body-col">
                             <form id="profile-save" className="info-user" onSubmit={updateProfile}>
                                 <div className="form-group">
-                                    <label htmlFor="infoname" className="form-label">
-                                        Họ và tên
-                                    </label>
+                                    <label htmlFor="infoname" className="form-label">Họ và tên</label>
                                     <input
                                         className="form-control"
                                         type="text"
-                                        name="fullname"
+                                        name="hoVaTen"
                                         id="infoname"
-                                        value={profileForm.fullname}
+                                        value={profileForm.hoVaTen}
                                         onChange={handleProfileChange}
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label htmlFor="infophone" className="form-label">
-                                        Số điện thoại
-                                    </label>
+                                    <label htmlFor="infophone" className="form-label">Số điện thoại</label>
                                     <input
                                         className="form-control"
                                         type="text"
-                                        name="infophone"
                                         id="infophone"
                                         disabled
-                                        value={user.phone || ''}
+                                        value={user.phone || user.soDienThoai || ''}
                                         readOnly
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label htmlFor="infoemail" className="form-label">
-                                        Email
-                                    </label>
+                                    <label htmlFor="infoemail" className="form-label">Email</label>
                                     <input
                                         className="form-control"
                                         type="email"
@@ -115,16 +116,14 @@ function AccountPage() {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label htmlFor="infoaddress" className="form-label">
-                                        Địa chỉ
-                                    </label>
+                                    <label htmlFor="infoaddress" className="form-label">Địa chỉ</label>
                                     <input
                                         className="form-control"
                                         type="text"
-                                        name="address"
+                                        name="diaChi"
                                         id="infoaddress"
                                         placeholder="Thêm địa chỉ giao hàng của bạn"
-                                        value={profileForm.address}
+                                        value={profileForm.diaChi}
                                         onChange={handleProfileChange}
                                     />
                                 </div>
@@ -133,37 +132,31 @@ function AccountPage() {
                         <div className="main-account-body-col">
                             <form id="password-save" className="change-password" onSubmit={updatePassword}>
                                 <div className="form-group">
-                                    <label htmlFor="password-cur-info" className="form-label w60">
-                                        Mật khẩu hiện tại
-                                    </label>
+                                    <label htmlFor="password-cur-info" className="form-label w60">Mật khẩu hiện tại</label>
                                     <input
                                         className="form-control"
                                         type="password"
-                                        name="currentPassword"
+                                        name="matKhauCu"
                                         id="password-cur-info"
                                         placeholder="Nhập mật khẩu hiện tại"
-                                        value={passwordForm.currentPassword}
+                                        value={passwordForm.matKhauCu}
                                         onChange={handlePasswordChange}
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label htmlFor="password-after-info" className="form-label w60">
-                                        Mật khẩu mới
-                                    </label>
+                                    <label htmlFor="password-after-info" className="form-label w60">Mật khẩu mới</label>
                                     <input
                                         className="form-control"
                                         type="password"
-                                        name="newPassword"
+                                        name="matKhauMoi"
                                         id="password-after-info"
                                         placeholder="Nhập mật khẩu mới"
-                                        value={passwordForm.newPassword}
+                                        value={passwordForm.matKhauMoi}
                                         onChange={handlePasswordChange}
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label htmlFor="password-comfirm-info" className="form-label w60">
-                                        Xác nhận mật khẩu mới
-                                    </label>
+                                    <label htmlFor="password-comfirm-info" className="form-label w60">Xác nhận mật khẩu mới</label>
                                     <input
                                         className="form-control"
                                         type="password"

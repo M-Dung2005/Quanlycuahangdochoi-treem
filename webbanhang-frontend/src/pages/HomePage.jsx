@@ -5,7 +5,7 @@ import ProductGrid from '../components/ProductGrid/ProductGrid';
 import Pagination from '../components/Pagination/Pagination';
 import ProductModal from '../components/ProductModal/ProductModal';
 import SearchBar from '../components/SearchBar/SearchBar';
-import { removeVietnameseTones } from '../utils/helpers';
+import { removeVietnameseTones, normalizeProduct } from '../utils/helpers';
 import { useApp } from '../context/AppContext';
 
 function HomePage() {
@@ -29,14 +29,16 @@ function HomePage() {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                let url = '/products';
-                const queryParts = [];
-                if (categoryQuery) queryParts.push(`category=${encodeURIComponent(categoryQuery)}`);
-                if (queryParts.length > 0) {
-                    url += `?${queryParts.join('&')}`;
-                }
-                const data = await axiosClient.get(url);
-                const list = Array.isArray(data) ? data : [];
+                // Gọi API mới: filter theo idDanhMuc hoặc tên danh mục
+                // Backend mới trả về { total, page, products: [...] }
+                let url = '/products?limit=200';
+                if (categoryQuery) url += `&search=${encodeURIComponent(categoryQuery)}`;
+
+                const res = await axiosClient.get(url);
+                // Hỗ trợ cả 2 format: array cũ hoặc { products: [] } mới
+                const rawList = Array.isArray(res) ? res : (res.products ?? []);
+                const list = rawList.map(normalizeProduct);
+
                 setProducts(list);
 
                 let finalData = list;
@@ -49,16 +51,13 @@ function HomePage() {
                 setCurrentPage(1);
             } catch (error) {
                 console.error('Lỗi lấy sản phẩm:', error);
-                const msg =
-                    error?.message ||
-                    'Không kết nối được máy chủ. Hãy chạy backend (npm run dev trong webbanhang-backend) và kiểm tra database.';
-                showToast(msg, 'error');
+                showToast(error?.message || 'Không kết nối được máy chủ.', 'error');
                 setProducts([]);
                 setFilteredProducts([]);
             }
         };
         fetchProducts();
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ refetch khi query đổi
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [categoryQuery, searchQuery]);
 
     const handleAdvancedSearch = (params) => {
@@ -71,17 +70,10 @@ function HomePage() {
                 removeVietnameseTones(p.title).includes(removeVietnameseTones(params.search))
             );
         }
-        if (params.minPrice) {
-            rs = rs.filter((p) => p.price >= parseInt(params.minPrice, 10));
-        }
-        if (params.maxPrice) {
-            rs = rs.filter((p) => p.price <= parseInt(params.maxPrice, 10));
-        }
-        if (params.sortMode === 1) {
-            rs.sort((a, b) => a.price - b.price);
-        } else if (params.sortMode === 2) {
-            rs.sort((a, b) => b.price - a.price);
-        }
+        if (params.minPrice) rs = rs.filter((p) => p.price >= parseInt(params.minPrice, 10));
+        if (params.maxPrice) rs = rs.filter((p) => p.price <= parseInt(params.maxPrice, 10));
+        if (params.sortMode === 1) rs.sort((a, b) => a.price - b.price);
+        else if (params.sortMode === 2) rs.sort((a, b) => b.price - a.price);
         setFilteredProducts(rs);
         setCurrentPage(1);
         setIsAdvanceSearchOpen(false);
@@ -108,36 +100,28 @@ function HomePage() {
                     </div>
                     <div className="home-service" id="home-service">
                         <div className="home-service-item">
-                            <div className="home-service-item-icon">
-                                <i className="fa-light fa-person-carry-box"></i>
-                            </div>
+                            <div className="home-service-item-icon"><i className="fa-light fa-person-carry-box"></i></div>
                             <div className="home-service-item-content">
                                 <h4 className="home-service-item-content-h">GIAO HÀNG NHANH</h4>
                                 <p className="home-service-item-content-desc">Cho tất cả đơn hàng</p>
                             </div>
                         </div>
                         <div className="home-service-item">
-                            <div className="home-service-item-icon">
-                                <i className="fa-light fa-shield-heart"></i>
-                            </div>
+                            <div className="home-service-item-icon"><i className="fa-light fa-shield-heart"></i></div>
                             <div className="home-service-item-content">
                                 <h4 className="home-service-item-content-h">SẢN PHẨM AN TOÀN</h4>
                                 <p className="home-service-item-content-desc">Cam kết chất lượng</p>
                             </div>
                         </div>
                         <div className="home-service-item">
-                            <div className="home-service-item-icon">
-                                <i className="fa-light fa-headset"></i>
-                            </div>
+                            <div className="home-service-item-icon"><i className="fa-light fa-headset"></i></div>
                             <div className="home-service-item-content">
                                 <h4 className="home-service-item-content-h">HỖ TRỢ 24/7</h4>
                                 <p className="home-service-item-content-desc">Tất cả ngày trong tuần</p>
                             </div>
                         </div>
                         <div className="home-service-item">
-                            <div className="home-service-item-icon">
-                                <i className="fa-light fa-circle-dollar"></i>
-                            </div>
+                            <div className="home-service-item-icon"><i className="fa-light fa-circle-dollar"></i></div>
                             <div className="home-service-item-content">
                                 <h4 className="home-service-item-content-h">HOÀN LẠI TIỀN</h4>
                                 <p className="home-service-item-content-desc">Nếu không hài lòng</p>

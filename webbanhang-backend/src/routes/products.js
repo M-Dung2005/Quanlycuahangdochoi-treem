@@ -1,110 +1,125 @@
 const express = require('express');
 const router = express.Router();
-const Product = require('../models/Product');
+const { Op } = require('sequelize');
+const { SanPham, DanhMuc, KhoHang } = require('../models');
 const { verifyToken } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/isAdmin');
-const { Op } = require('sequelize');
 
 // [GET] /api/products
-// Support query: ?search=xyz&category=lego&minPrice=100&maxPrice=500
+// Query: ?search=&idDanhMuc=&minPrice=&maxPrice=&page=&limit=
 router.get('/', async (req, res) => {
-    try {
-        const { search, category, minPrice, maxPrice } = req.query;
+  try {
+    const { search, idDanhMuc, minPrice, maxPrice, page = 1, limit = 60 } = req.query;
+    const where = { trangThai: 1 };
 
-        let whereClause = {
-            status: 1 // Chỉ lấy sản phẩm đang hiện
-        };
-
-        if (category && category !== 'Tất cả') {
-            whereClause.category = category;
-        }
-
-        if (search) {
-            whereClause.title = {
-                [Op.like]: `%${search}%`
-            };
-        }
-
-        if (minPrice || maxPrice) {
-            whereClause.price = {};
-            if (minPrice) whereClause.price[Op.gte] = minPrice;
-            if (maxPrice) whereClause.price[Op.lte] = maxPrice;
-        }
-
-        const products = await Product.findAll({
-            where: whereClause
-        });
-
-        res.json(products);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Lỗi server' });
+    if (idDanhMuc) where.idDanhMuc = idDanhMuc;
+    if (search) where.tieuDe = { [Op.like]: `%${search}%` };
+    if (minPrice || maxPrice) {
+      where.gia = {};
+      if (minPrice) where.gia[Op.gte] = minPrice;
+      if (maxPrice) where.gia[Op.lte] = maxPrice;
     }
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const { count, rows } = await SanPham.findAndCountAll({
+      where,
+      include: [
+        { model: DanhMuc, as: 'danhMuc', attributes: ['id', 'tenDanhMuc'] },
+        { model: KhoHang, as: 'khoHang', attributes: ['soLuongTon'] }
+      ],
+      limit: parseInt(limit),
+      offset
+    });
+
+    res.json({ total: count, page: parseInt(page), products: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server' });
+  }
 });
 
-// [GET] /api/products/all (Dành cho admin: lấy cả sp ẩn)
+// [GET] /api/products/all (Admin: lấy cả sp ẩn)
 router.get('/all', verifyToken, isAdmin, async (req, res) => {
-    try {
-        const products = await Product.findAll();
-        res.json(products);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Lỗi server' });
-    }
+  try {
+    const products = await SanPham.findAll({
+      include: [
+        { model: DanhMuc, as: 'danhMuc', attributes: ['id', 'tenDanhMuc'] },
+        { model: KhoHang, as: 'khoHang', attributes: ['soLuongTon'] }
+      ]
+    });
+    res.json(products);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server' });
+  }
 });
 
 // [GET] /api/products/:id
 router.get('/:id', async (req, res) => {
-    try {
-        const product = await Product.findByPk(req.params.id);
-        if (!product) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
-        res.json(product);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Lỗi server' });
-    }
+  try {
+    const sp = await SanPham.findByPk(req.params.id, {
+      include: [
+        { model: DanhMuc, as: 'danhMuc', attributes: ['id', 'tenDanhMuc'] },
+        { model: KhoHang, as: 'khoHang', attributes: ['soLuongTon'] }
+      ]
+    });
+    if (!sp) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
+    res.json(sp);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server' });
+  }
 });
 
 // [POST] /api/products (Admin)
 router.post('/', verifyToken, isAdmin, async (req, res) => {
-    try {
-        const { title, img, category, price, desc, status } = req.body;
-        const newProduct = await Product.create({ 
-            title, img: img || './assets/img/blank-image.png', category, price, desc, status 
-        });
-        res.status(201).json(newProduct);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Lỗi server' });
-    }
+  try {
+    const { tieuDe, hinhAnh, idDanhMuc, gia, moTa, thuongHieu, tuoiPhuHop, chatLieu, kichThuoc, trongLuong, soLuongTon = 0 } = req.body;
+    const sp = await SanPham.create({
+      tieuDe,
+      hinhAnh: hinhAnh || './assets/img/blank-image.png',
+      idDanhMuc,
+      gia,
+      moTa,
+      thuongHieu,
+      tuoiPhuHop,
+      chatLieu,
+      kichThuoc,
+      trongLuong
+    });
+    // Tạo kho hàng tương ứng
+    await KhoHang.create({ idSanPham: sp.id, soLuongTon });
+    res.status(201).json(sp);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server' });
+  }
 });
 
 // [PUT] /api/products/:id (Admin)
 router.put('/:id', verifyToken, isAdmin, async (req, res) => {
-    try {
-        const product = await Product.findByPk(req.params.id);
-        if (!product) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
-
-        await product.update(req.body);
-        res.json(product);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Lỗi server' });
-    }
+  try {
+    const sp = await SanPham.findByPk(req.params.id);
+    if (!sp) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
+    await sp.update(req.body);
+    res.json(sp);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server' });
+  }
 });
 
-// [DELETE] /api/products/:id (Admin) - Thường thì chỉ set status = 0
+// [DELETE] /api/products/:id (Admin) - Ẩn sản phẩm
 router.delete('/:id', verifyToken, isAdmin, async (req, res) => {
-    try {
-        const product = await Product.findByPk(req.params.id);
-        if (!product) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
-
-        await product.update({ status: 0 }); // Ẩn sản phẩm thay vì xóa cứng
-        res.json({ message: 'Đã ẩn sản phẩm thành công' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Lỗi server' });
-    }
+  try {
+    const sp = await SanPham.findByPk(req.params.id);
+    if (!sp) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
+    await sp.update({ trangThai: 0 });
+    res.json({ message: 'Đã ẩn sản phẩm thành công' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server' });
+  }
 });
 
 module.exports = router;

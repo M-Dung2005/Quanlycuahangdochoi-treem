@@ -9,10 +9,13 @@ export default defineConfig(({ mode }) => {
         plugins: [react()],
         server: {
             port: 5173,
+            host: true, // cho phép truy cập từ network local
             proxy: {
                 '/api': {
                     target: proxyTarget,
                     changeOrigin: true,
+                    secure: false,       // bỏ qua SSL cert check (dev)
+                    ws: false,           // không proxy WebSocket
                 },
             },
         },

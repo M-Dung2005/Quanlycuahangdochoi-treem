@@ -8,7 +8,7 @@ const sequelize = new Sequelize(
   process.env.DB_PASS, 
   {
     host: process.env.DB_SERVER,
-    port: 2222,
+    port: parseInt(process.env.DB_PORT || '1433'),
     dialect: 'mssql',
     dialectOptions: {
       options: {
